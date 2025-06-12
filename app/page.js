@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faMinus } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faMinus, faUpload, faImage } from '@fortawesome/free-solid-svg-icons';
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
@@ -10,6 +10,10 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [generatedImages, setGeneratedImages] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false); // For modal
+
+  // Image upload states for image-to-image models
+  const [inputImage, setInputImage] = useState(null);
+  const [inputImagePreview, setInputImagePreview] = useState(null);
 
   // Additional parameters for fine-tuning
   const [imageSize, setImageSize] = useState("landscape_4_3");
@@ -24,6 +28,36 @@ export default function Home() {
 
   // Model Selection
   const [model, setModel] = useState("fal-ai/flux-lora");
+
+  // Model pricing information (per megapixel)
+  const modelPricing = {
+    "fal-ai/flux-lora": { price: 0.025, name: "Flux LoRA", description: "Best for custom styles" },
+    "fal-ai/flux/dev": { price: 0.025, name: "Flux Development", description: "High-quality generation" },
+    "fal-ai/flux-realism": { price: 0.025, name: "Flux Realism", description: "Photorealistic images" },
+    "fal-ai/flux-pro": { price: 0.05, name: "FLUX.1 [pro]", description: "Premium quality" },
+    "fal-ai/flux-pro/v1.1": { price: 0.04, name: "FLUX1.1 [pro]", description: "6x faster than FLUX.1" },
+    "fal-ai/flux-pro/kontext": { price: 0.04, name: "FLUX.1 Kontext [pro]", description: "Advanced image editing" },
+    "fal-ai/flux/schnell": { price: 0.003, name: "FLUX.1 [schnell]", description: "Ultra-fast generation" }
+  };
+
+  // Calculate estimated cost based on image size and model
+  const calculateCost = () => {
+    const modelInfo = modelPricing[model];
+    if (!modelInfo) return 0;
+
+    // Image size to megapixels mapping
+    const sizeMegapixels = {
+      "square_hd": 1.0,        // 1024x1024 = ~1MP
+      "portrait_4_3": 0.75,    // ~0.75MP  
+      "portrait_16_9": 0.5,    // ~0.5MP
+      "landscape_4_3": 0.75,   // ~0.75MP
+      "landscape_16_9": 0.5    // ~0.5MP
+    };
+
+    const megapixels = sizeMegapixels[imageSize] || 1.0;
+    const totalCost = modelInfo.price * megapixels * numImages;
+    return totalCost.toFixed(3);
+  };
 
   // Fetch generated images from the outputs directory
   useEffect(() => {
@@ -60,12 +94,41 @@ export default function Home() {
     setImageUrl(null);
 
     try {
-      const response = await fetch("/api/generateImage", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      // Check if Kontext model requires input image
+      if (requiresInputImage() && !inputImage) {
+        setError("请为Kontext模型上传一张输入图片");
+        setLoading(false);
+        return;
+      }
+
+      let requestBody;
+      let headers = {};
+
+      // For Kontext model, use FormData to upload image
+      if (requiresInputImage() && inputImage) {
+        const formData = new FormData();
+        formData.append("prompt", prompt);
+        formData.append("image_size", imageSize);
+        formData.append("num_inference_steps", numInferenceSteps);
+        formData.append("guidance_scale", guidanceScale);
+        formData.append("num_images", numImages);
+        formData.append("enable_safety_checker", enableSafetyChecker);
+        formData.append("strength", strength);
+        formData.append("output_format", outputFormat);
+        formData.append("sync_mode", syncMode);
+        formData.append("model", model);
+        formData.append("input_image", inputImage);
+        
+        // Add LoRAs if any
+        const filteredLoras = loraUrls.filter(lora => lora.url.trim() !== "");
+        formData.append("loras", JSON.stringify(filteredLoras.map(lora => ({ path: lora.url, scale: lora.scale }))));
+        
+        requestBody = formData;
+        // Don't set Content-Type header for FormData, let browser set it with boundary
+      } else {
+        // For other models, use JSON
+        headers["Content-Type"] = "application/json";
+        requestBody = JSON.stringify({
           prompt,
           image_size: imageSize,
           num_inference_steps: numInferenceSteps,
@@ -79,7 +142,13 @@ export default function Home() {
           loras: loraUrls
             .filter(lora => lora.url.trim() !== "") // Filter out any LoRAs with empty URLs
             .map(lora => ({ path: lora.url, scale: lora.scale })),
-        }),
+        });
+      }
+
+      const response = await fetch("/api/generateImage", {
+        method: "POST",
+        headers,
+        body: requestBody,
       });
 
       const data = await response.json();
@@ -133,65 +202,212 @@ export default function Home() {
     setLoraUrls(updatedLoraUrls);
   };
 
+  // Handle image upload for image-to-image models
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setInputImage(file);
+      
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setInputImagePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Clear uploaded image
+  const clearInputImage = () => {
+    setInputImage(null);
+    setInputImagePreview(null);
+  };
+
+  // Check if current model requires input image
+  const requiresInputImage = () => {
+    return model === "fal-ai/flux-pro/kontext";
+  };
+
   return (
-    <div className="grid grid-cols-12 gap-4 h-screen p-4 bg-[#C1EEFF]">
-      {/* Left Sidebar for form */}
-      <div className="col-span-3 bg-gray-100 border-r border-gray-300 overflow-y-auto space-y-6 shadow-lg p-4 h-full">
-        <h2 className="text-2xl font-bold text-gray-800">fal.ai Image Generator</h2>
-        <form onSubmit={generateImage} className="space-y-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100">
+      <div className="container mx-auto px-6 py-8">
+        <div className="grid grid-cols-12 gap-8 h-screen">
+          {/* Left Sidebar for form */}
+          <div className="col-span-3 apple-card-elevated custom-scrollbar overflow-y-auto space-y-6 p-6 h-full animate-fade-in-up">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Image Studio</h1>
+              <p className="text-gray-500 font-medium">Powered by fal.ai</p>
+            </div>
+        <form onSubmit={generateImage} className="space-y-6">
 
           {/* Prompt */}
-          <div>
-            <label htmlFor="prompt" className="block text-lg font-medium text-gray-700">
-              Enter your prompt
+          <div className="animate-fade-in-up">
+            <label htmlFor="prompt" className="block text-sm font-semibold text-gray-900 mb-3">
+              Describe your vision
             </label>
             <textarea
               id="prompt"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               required
-              className="mt-2 p-3 w-full h-24 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-gray-300 resize-y overflow-y-auto"
-              placeholder="A charismatic speaker is captured mid-speech..."
+              className="apple-input h-28 resize-none text-sm leading-relaxed"
+              placeholder="Describe what you want to create in detail..."
             />
+          </div>
+
+          {/* Cost Summary */}
+          <div className="animate-fade-in-up p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">Generation Cost</span>
+              <span className="text-lg font-bold text-purple-600">${calculateCost()}</span>
+            </div>
+            <div className="text-xs text-gray-500 space-y-1">
+              <div className="flex justify-between">
+                <span>{modelPricing[model]?.name}</span>
+                <span>${modelPricing[model]?.price}/MP</span>
+              </div>
+              <div className="flex justify-between">
+                <span>{numImages} image{numImages > 1 ? 's' : ''} × {imageSize.replace('_', ' ')}</span>
+                <span>≈ {(modelPricing[model]?.price * (imageSize === 'square_hd' ? 1.0 : imageSize.includes('portrait') ? 0.75 : 0.5) * numImages).toFixed(3)}MP</span>
+              </div>
+            </div>
           </div>
 
           {/* Submit Prompt */}
           <button
             type="submit"
-            className="w-full py-3 px-6 bg-black text-white rounded-lg shadow-md hover:bg-gray-700"
+            disabled={loading}
+            className="apple-button-primary w-full text-center font-semibold text-base py-4 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Try this prompt →
+            {loading ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Creating magic...
+              </span>
+            ) : (
+              `Generate for $${calculateCost()} ✨`
+            )}
           </button>
 
           {/* Model Selection */}
-          <div>
-            <label htmlFor="model" className="block text-lg font-medium text-gray-700">
-              Select Model
+          <div className="animate-fade-in-up">
+            <label htmlFor="model" className="block text-sm font-semibold text-gray-900 mb-3">
+              AI Model
             </label>
             <select
               id="model"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              className="mt-2 p-3 w-full border border-gray-300 rounded-lg shadow-sm"
+              className="apple-select text-sm"
             >
-              <option value="fal-ai/flux-lora">flux-lora</option>
-              <option value="fal-ai/flux/dev">flux/dev</option>
-              <option value="fal-ai/flux-realism">flux-realism</option>
+              <optgroup label="🚀 Fast & Affordable">
+                <option value="fal-ai/flux/schnell">FLUX.1 [schnell] - $0.003/MP (Ultra Fast)</option>
+                <option value="fal-ai/flux-lora">Flux LoRA - $0.025/MP (Custom Styles)</option>
+                <option value="fal-ai/flux/dev">Flux Development - $0.025/MP (High Quality)</option>
+                <option value="fal-ai/flux-realism">Flux Realism - $0.025/MP (Photorealistic)</option>
+              </optgroup>
+              <optgroup label="✨ Premium Quality">
+                <option value="fal-ai/flux-pro/v1.1">FLUX1.1 [pro] - $0.04/MP (6x Faster)</option>
+                <option value="fal-ai/flux-pro/kontext">FLUX.1 Kontext [pro] - $0.04/MP (Image Editing)</option>
+                <option value="fal-ai/flux-pro">FLUX.1 [pro] - $0.05/MP (Premium)</option>
+              </optgroup>
             </select>
+            
+            {/* Model Description and Cost Estimate */}
+            <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="text-sm">
+                <p className="font-medium text-blue-900 mb-1">
+                  {modelPricing[model]?.name}
+                </p>
+                <p className="text-blue-700 text-xs mb-2">
+                  {modelPricing[model]?.description}
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-blue-600">
+                    Estimated cost: <span className="font-semibold">${calculateCost()}</span>
+                  </span>
+                  <span className="text-xs text-blue-500">
+                    {numImages} image{numImages > 1 ? 's' : ''}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
+          {/* Image Upload for Image-to-Image Models */}
+          {requiresInputImage() && (
+            <div className="animate-fade-in-up">
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
+                Input Image <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-3">
+                {!inputImagePreview ? (
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      id="imageUpload"
+                      required={requiresInputImage()}
+                    />
+                    <label
+                      htmlFor="imageUpload"
+                      className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors duration-200"
+                    >
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <FontAwesomeIcon icon={faUpload} className="w-8 h-8 mb-3 text-gray-400" />
+                        <p className="mb-2 text-sm text-gray-500">
+                          <span className="font-semibold">Click to upload</span> an image
+                        </p>
+                        <p className="text-xs text-gray-500">PNG, JPG or JPEG (MAX. 10MB)</p>
+                      </div>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <img
+                      src={inputImagePreview}
+                      alt="Input preview"
+                      className="w-full h-32 object-cover rounded-xl border border-gray-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={clearInputImage}
+                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                    >
+                      ×
+                    </button>
+                    <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                      <FontAwesomeIcon icon={faImage} className="mr-1" />
+                      Input Image
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="mt-2 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                <p className="text-sm text-yellow-800">
+                  💡 <strong>Kontext模式:</strong> 上传一张图片，然后用文字描述你想要对图片进行的修改。
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Image Size */}
-          <div>
-            <label htmlFor="imageSize" className="block text-lg font-medium text-gray-700">
-              Image Size
+          <div className="animate-fade-in-up">
+            <label htmlFor="imageSize" className="block text-sm font-semibold text-gray-900 mb-3">
+              Canvas Size
             </label>
             <select
               id="imageSize"
               value={imageSize}
               onChange={(e) => setImageSize(e.target.value)}
-              className="mt-2 p-3 w-full border border-gray-300 rounded-lg shadow-sm"
+              className="apple-select text-sm"
             >
-              <option value="square_hd">Square HD</option>
+              <option value="square_hd">Square HD (1:1)</option>
               <option value="portrait_4_3">Portrait (3:4)</option>
               <option value="portrait_16_9">Portrait (9:16)</option>
               <option value="landscape_4_3">Landscape (4:3)</option>
@@ -200,233 +416,334 @@ export default function Home() {
           </div>
 
           {/* LoRA URL Input */}
-          <div>
-            <label htmlFor="loraUrl" className="block text-lg font-medium text-gray-700">
-              LoRA URLs
+          <div className="animate-fade-in-up">
+            <label htmlFor="loraUrl" className="block text-sm font-semibold text-gray-900 mb-3">
+              Custom LoRA Models
             </label>
-            {loraUrls.map((lora, index) => (
-              <div key={index} className="mt-2">
-                <input
-                  type="text"
-                  value={lora.url}
-                  onChange={(e) => handleLoraChange(index, e.target.value)}
-                  className="p-3 w-full border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-gray-300"
-                  placeholder="Enter LoRA URL"
-                />
-                <input
-                  type="number"
-                  value={lora.scale}
-                  onChange={(e) => handleLoraScaleChange(index, e.target.value)}
-                  className="mt-2 p-3 w-full border border-gray-300 rounded-lg shadow-sm"
-                  placeholder="Enter Scale (0.0 - 1.0)"
-                />
-              </div>
-            ))}
+            <div className="space-y-3">
+              {loraUrls.map((lora, index) => (
+                <div key={index} className="space-y-2">
+                  <input
+                    type="text"
+                    value={lora.url}
+                    onChange={(e) => handleLoraChange(index, e.target.value)}
+                    className="apple-input text-sm"
+                    placeholder="Enter LoRA URL"
+                  />
+                  <input
+                    type="number"
+                    value={lora.scale}
+                    onChange={(e) => handleLoraScaleChange(index, e.target.value)}
+                    className="apple-input text-sm"
+                    placeholder="Scale (0.0 - 1.0)"
+                    step="0.1"
+                    min="0"
+                    max="1"
+                  />
+                </div>
+              ))}
 
-            {/* Buttons to add/remove LoRA fields */}
-            <div className="mt-2">
-              <button
-                type="button"
-                onClick={addLoraField}
-                className="py-3 px-6 bg-black text-white rounded-lg shadow-md hover:bg-gray-700"
-              >
-                <FontAwesomeIcon icon={faPlus} /> {/* Add icon */}
-              </button>
-
-              {loraUrls.length > 1 && (
+              {/* Buttons to add/remove LoRA fields */}
+              <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={removeLoraField}
-                  className="py-3 px-6 bg-black text-white rounded-lg shadow-md hover:bg-gray-700 ml-2"
+                  onClick={addLoraField}
+                  className="apple-button-secondary flex-1 py-2 text-sm"
                 >
-                  <FontAwesomeIcon icon={faMinus} /> {/* Remove icon */}
+                  <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                  Add LoRA
                 </button>
-              )}
+
+                {loraUrls.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={removeLoraField}
+                    className="apple-button-secondary px-4 py-2 text-sm"
+                  >
+                    <FontAwesomeIcon icon={faMinus} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Advanced Settings Section */}
+          <div className="animate-fade-in-up pt-4 border-t border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Advanced Settings</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              {/* Number of Inference Steps */}
+              <div>
+                <label htmlFor="numInferenceSteps" className="block text-sm font-medium text-gray-700 mb-2">
+                  Steps
+                </label>
+                <input
+                  type="number"
+                  id="numInferenceSteps"
+                  value={numInferenceSteps}
+                  onChange={(e) => setNumInferenceSteps(e.target.value)}
+                  className="apple-input text-sm"
+                  min="1"
+                />
+              </div>
+
+              {/* Guidance Scale */}
+              <div>
+                <label htmlFor="guidanceScale" className="block text-sm font-medium text-gray-700 mb-2">
+                  Guidance
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  id="guidanceScale"
+                  value={guidanceScale}
+                  onChange={(e) => setGuidanceScale(e.target.value)}
+                  className="apple-input text-sm"
+                />
+              </div>
+
+              {/* Number of Images */}
+              <div>
+                <label htmlFor="numImages" className="block text-sm font-medium text-gray-700 mb-2">
+                  Images
+                </label>
+                <input
+                  type="number"
+                  id="numImages"
+                  value={numImages}
+                  onChange={(e) => setNumImages(e.target.value)}
+                  className="apple-input text-sm"
+                  min="1"
+                  max="4"
+                />
+              </div>
+
+              {/* Strength */}
+              <div>
+                <label htmlFor="strength" className="block text-sm font-medium text-gray-700 mb-2">
+                  Strength
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  id="strength"
+                  value={strength}
+                  onChange={(e) => setStrength(e.target.value)}
+                  className="apple-input text-sm"
+                  min="0"
+                  max="1"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Output Settings */}
+          <div className="animate-fade-in-up pt-4 border-t border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Output Settings</h3>
+            
+            {/* Output Format */}
+            <div className="mb-4">
+              <label htmlFor="outputFormat" className="block text-sm font-semibold text-gray-900 mb-3">
+                File Format
+              </label>
+              <select
+                id="outputFormat"
+                value={outputFormat}
+                onChange={(e) => setOutputFormat(e.target.value)}
+                className="apple-select text-sm"
+              >
+                <option value="jpeg">JPEG (Smaller file)</option>
+                <option value="png">PNG (Higher quality)</option>
+              </select>
             </div>
 
-          </div>
+            {/* Toggles */}
+            <div className="space-y-4">
+              {/* Enable Safety Checker */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <label htmlFor="enableSafetyChecker" className="text-sm font-medium text-gray-900">
+                    Content Safety
+                  </label>
+                  <p className="text-xs text-gray-500">Filter inappropriate content</p>
+                </div>
+                <input
+                  type="checkbox"
+                  id="enableSafetyChecker"
+                  checked={enableSafetyChecker}
+                  onChange={(e) => setEnableSafetyChecker(e.target.checked)}
+                  className="h-5 w-5 text-blue-500 border-2 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
+                />
+              </div>
 
-          {/* Number of Inference Steps */}
-          <div>
-            <label htmlFor="numInferenceSteps" className="block text-lg font-medium text-gray-700">
-              Number of Inference Steps
-            </label>
-            <input
-              type="number"
-              id="numInferenceSteps"
-              value={numInferenceSteps}
-              onChange={(e) => setNumInferenceSteps(e.target.value)}
-              className="mt-2 p-3 w-full border border-gray-300 rounded-lg shadow-sm"
-              min="1"
-            />
-          </div>
-
-          {/* Guidance Scale */}
-          <div>
-            <label htmlFor="guidanceScale" className="block text-lg font-medium text-gray-700">
-              Guidance Scale
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              id="guidanceScale"
-              value={guidanceScale}
-              onChange={(e) => setGuidanceScale(e.target.value)}
-              className="mt-2 p-3 w-full border border-gray-300 rounded-lg shadow-sm"
-            />
-          </div>
-
-          {/* Number of Images */}
-          <div>
-            <label htmlFor="numImages" className="block text-lg font-medium text-gray-700">
-              Number of Images
-            </label>
-            <input
-              type="number"
-              id="numImages"
-              value={numImages}
-              onChange={(e) => setNumImages(e.target.value)}
-              className="mt-2 p-3 w-full border border-gray-300 rounded-lg shadow-sm"
-              min="1"
-            />
-          </div>
-
-          {/* Enable Safety Checker */}
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="enableSafetyChecker"
-              checked={enableSafetyChecker}
-              onChange={(e) => setEnableSafetyChecker(e.target.checked)}
-              className="h-4 w-4 text-gray-600 border-gray-300 rounded focus:ring-2 focus:ring-gray-300"
-            />
-            <label htmlFor="enableSafetyChecker" className="ml-2 text-lg font-medium text-gray-700">
-              NSFW Disabled
-            </label>
-          </div>
-
-          {/* Strength */}
-          <div>
-            <label htmlFor="strength" className="block text-lg font-medium text-gray-700">
-              Strength
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              id="strength"
-              value={strength}
-              onChange={(e) => setStrength(e.target.value)}
-              className="mt-2 p-3 w-full border border-gray-300 rounded-lg shadow-sm"
-            />
-          </div>
-
-          {/* Output Format */}
-          <div>
-            <label htmlFor="outputFormat" className="block text-lg font-medium text-gray-700">
-              Output Format
-            </label>
-            <select
-              id="outputFormat"
-              value={outputFormat}
-              onChange={(e) => setOutputFormat(e.target.value)}
-              className="mt-2 p-3 w-full border border-gray-300 rounded-lg shadow-sm"
-            >
-              <option value="jpeg">JPEG</option>
-              <option value="png">PNG</option>
-            </select>
-          </div>
-
-          {/* Sync Mode */}
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="syncMode"
-              checked={syncMode}
-              onChange={(e) => setSyncMode(e.target.checked)}
-              className="h-4 w-4 text-gray-600 border-gray-300 rounded focus:ring-2 focus:ring-gray-300"
-            />
-            <label htmlFor="syncMode" className="ml-2 text-lg font-medium text-gray-700">
-              Sync Mode
-            </label>
+              {/* Sync Mode */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <label htmlFor="syncMode" className="text-sm font-medium text-gray-900">
+                    Real-time Mode
+                  </label>
+                  <p className="text-xs text-gray-500">Faster processing</p>
+                </div>
+                <input
+                  type="checkbox"
+                  id="syncMode"
+                  checked={syncMode}
+                  onChange={(e) => setSyncMode(e.target.checked)}
+                  className="h-5 w-5 text-blue-500 border-2 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
+                />
+              </div>
+            </div>
           </div>
 
         </form>
 
-        {loading && <p className="text-lg text-gray-700">Generating image...</p>}
-        {error && <p className="text-lg text-red-600">{error}</p>}
-      </div>
-
-      {/* Center Panel for displaying the generated image */}
-      <div className="col-span-7 flex items-center justify-center p-4 bg-white shadow-lg">
-        {loading ? (
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-gray-500 mx-auto"></div>
-            <p className="text-gray-600 mt-4">Image loading...</p>
-          </div>
-        ) : imageUrl ? (
-          <div className="relative">
-            <img
-              src={imageUrl}
-              alt="Generated AI Image"
-              className="max-w-full max-h-screen object-contain border border-gray-300 rounded-lg shadow-lg cursor-pointer"
-              onClick={handleImageClick} // Trigger the modal when the image is clicked
-            />
-          </div>
-        ) : (
-          <p className="text-gray-600">No image generated yet</p>
-        )}
-
-        {/* Modal for full-size image */}
-        {isModalOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
-            onClick={handleCloseModal} // Close the modal when clicking outside the image
-          >
-            <div
-              className="relative w-auto max-w-full p-4 bg-white rounded-lg shadow-lg overflow-auto"
-              onClick={(e) => e.stopPropagation()} // Prevent modal close when clicking inside the modal
-              style={{ maxHeight: '95vh' }} // Ensure the modal takes up most of the viewport but allows scrolling
-            >
-              {/* X button to close the modal */}
-              <button
-                className="absolute top-4 right-4 text-gray-700 text-3xl font-bold hover:text-gray-900"
-                onClick={handleCloseModal}
-              >
-                &times;
-              </button>
-
-              {/* Full-size image with max constraints inside the modal */}
-              <div className="flex justify-center items-center">
-                <img
-                  src={imageUrl}
-                  alt="Full-size Generated AI Image"
-                  className="w-auto h-auto"
-                  style={{ maxWidth: '100%', maxHeight: 'none' }} // Prevent scaling the image down
-                />
+        {/* Status Messages */}
+        {error && (
+          <div className="animate-scale-in p-4 bg-red-50 border border-red-200 rounded-xl">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-red-800">{error}</p>
               </div>
             </div>
           </div>
         )}
-      </div>
+          </div>
 
-      {/* Right Sidebar for generated image history */}
-      <div className="col-span-2 bg-gray-100 border-l border-gray-300 overflow-auto shadow-lg p-4">
-        <h2 className="text-lg font-semibold text-gray-700">Image History</h2>
-        <ul className="space-y-2">
-          {generatedImages.map((image, index) => (
-            <li
-              key={index}
-              className="cursor-pointer p-2 bg-gray-200 rounded-lg shadow hover:bg-gray-300"
-              onClick={() => setImageUrl(`/outputs/${image}`)} // Ensure the image path is correct
-            >
-              <img
-                src={`/outputs/${image}`}
-                alt={`Generated Image ${index + 1}`}
-                className="w-full h-auto border border-gray-300 rounded-lg"
-              />
-            </li>
-          ))}
-        </ul>
+          {/* Center Panel for displaying the generated image */}
+          <div className="col-span-7 apple-card-elevated flex flex-col p-8 animate-fade-in-up">
+            {/* Model Info Bar */}
+            <div className="flex items-center justify-between mb-6 p-4 bg-gray-50 rounded-xl">
+              <div className="flex items-center space-x-3">
+                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">{modelPricing[model]?.name}</h3>
+                  <p className="text-xs text-gray-500">{modelPricing[model]?.description}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">${modelPricing[model]?.price}/MP</p>
+                <p className="text-xs text-gray-500">Cost per megapixel</p>
+              </div>
+            </div>
+
+            {/* Image Display Area */}
+            <div className="flex-1 flex items-center justify-center">
+            {loading ? (
+              <div className="text-center">
+                <div className="relative w-20 h-20 mx-auto mb-6">
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 opacity-20"></div>
+                  <div className="absolute inset-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 animate-spin"></div>
+                  <div className="absolute inset-3 rounded-full bg-white"></div>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Creating your masterpiece</h3>
+                <p className="text-gray-500">This may take a few moments...</p>
+              </div>
+            ) : imageUrl ? (
+              <div className="relative group">
+                <img
+                  src={imageUrl}
+                  alt="Generated AI Image"
+                  className="max-w-full max-h-[70vh] object-contain squircle-lg shadow-xl cursor-pointer transition-transform duration-300 group-hover:scale-105"
+                  onClick={handleImageClick}
+                />
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 squircle-lg flex items-center justify-center">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-white font-semibold bg-black bg-opacity-50 px-4 py-2 rounded-full">
+                    Click to enlarge
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-20">
+                <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
+                  <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Ready to create</h3>
+                <p className="text-gray-500">Enter a prompt and click generate to start</p>
+              </div>
+            )}
+
+            {/* Enhanced Modal for full-size image */}
+            {isModalOpen && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 backdrop-blur-sm animate-scale-in"
+                onClick={handleCloseModal}
+              >
+                <div
+                  className="relative max-w-7xl max-h-[95vh] p-4"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Close button */}
+                  <button
+                    className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors duration-200 z-10"
+                    onClick={handleCloseModal}
+                  >
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+
+                  {/* Full-size image */}
+                  <img
+                    src={imageUrl}
+                    alt="Full-size Generated AI Image"
+                    className="max-w-full max-h-full object-contain squircle-lg shadow-2xl"
+                  />
+                </div>
+              </div>
+            )}
+            </div>
+          </div>
+
+          {/* Right Sidebar for generated image history */}
+          <div className="col-span-2 apple-card-elevated custom-scrollbar overflow-auto p-6 animate-fade-in-up">
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Gallery</h2>
+              <p className="text-sm text-gray-500">Your recent creations</p>
+            </div>
+            
+            <div className="space-y-3">
+              {generatedImages.length > 0 ? (
+                generatedImages.map((image, index) => (
+                  <div
+                    key={index}
+                    className="group cursor-pointer transition-all duration-200 hover:scale-105"
+                    onClick={() => setImageUrl(`/outputs/${image}`)}
+                  >
+                    <div className="relative overflow-hidden squircle-sm">
+                      <img
+                        src={`/outputs/${image}`}
+                        alt={`Generated Image ${index + 1}`}
+                        className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <div className="absolute bottom-2 left-2 right-2">
+                        <div className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black bg-opacity-50 px-2 py-1 rounded-md">
+                          Image #{generatedImages.length - index}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-2xl flex items-center justify-center">
+                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-gray-500">No images yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
