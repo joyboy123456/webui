@@ -27,25 +27,8 @@ export default function Home() {
     checkAuth();
   }, []);
 
-  // 显示加载状态
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">检查认证状态...</div>
-      </div>
-    );
-  }
-
-  // 如果未认证，显示登录提示
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <a href="/login" className="text-blue-600 underline hover:text-blue-800">
-          Please login first
-        </a>
-      </div>
-    );
-  }
+  // ---------------------
+  // State hooks (must run on every render)
   const [prompt, setPrompt] = useState("");
   const [imageUrl, setImageUrl] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -70,6 +53,53 @@ export default function Home() {
 
   // Model Selection
   const [model, setModel] = useState("fal-ai/flux-lora");
+  // ---------------------
+
+  // Fetch generated images from the outputs directory (needs hooks above)
+  useEffect(() => {
+    const fetchImages = async () => {
+      try {
+        const res = await fetch("/api/getGeneratedImages"); // Backend route that lists images
+        const data = await res.json();
+
+        // Sort images by timestamp in filename
+        const sortedImages = data.images.sort((a, b) => {
+          const timeA = parseInt(a.match(/(\d+)\.jpeg$/)[1]);
+          const timeB = parseInt(b.match(/(\d+)\.jpeg$/)[1]);
+          return timeB - timeA;
+        });
+
+        setGeneratedImages(sortedImages);
+        if (sortedImages.length > 0) {
+          setImageUrl(`/outputs/${sortedImages[0]}`);
+        }
+      } catch (err) {
+        console.error("Failed to fetch images:", err);
+      }
+    };
+    fetchImages();
+  }, []);
+
+  // ---------------- Guarded early returns (after all hooks/effects) ----------------
+  // 显示加载状态
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">检查认证状态...</div>
+      </div>
+    );
+  }
+
+  // 如果未认证，显示登录提示
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <a href="/login" className="text-blue-600 underline hover:text-blue-800">
+          Please login first
+        </a>
+      </div>
+    );
+  }
 
   // Model pricing information (per megapixel)
   const modelPricing = {
@@ -101,34 +131,6 @@ export default function Home() {
     return totalCost.toFixed(3);
   };
 
-  // Fetch generated images from the outputs directory
-  useEffect(() => {
-    const fetchImages = async () => {
-      try {
-        const res = await fetch("/api/getGeneratedImages"); // Backend route that lists images
-        const data = await res.json();
-
-        // Sort images by the numeric part of the filename (assuming the filename is like `generated-image-<timestamp>.jpeg`)
-        const sortedImages = data.images.sort((a, b) => {
-          const timeA = parseInt(a.match(/(\d+)\.jpeg$/)[1]);
-          const timeB = parseInt(b.match(/(\d+)\.jpeg$/)[1]);
-          return timeB - timeA; // Sort in descending order (most recent first)
-        });
-
-        setGeneratedImages(sortedImages);
-
-        // Display the most recent image by default
-        if (sortedImages.length > 0) {
-          setImageUrl(`/outputs/${sortedImages[0]}`);
-        }
-      } catch (error) {
-        console.error("Failed to fetch images:", error);
-      }
-    };
-
-    fetchImages();
-  }, []);
-
   const generateImage = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -143,58 +145,31 @@ export default function Home() {
         return;
       }
 
-      let requestBody;
-      let headers = {};
+      // Always use FormData for consistency with backend
+      const formData = new FormData();
+      formData.append("prompt", prompt);
+      formData.append("image_size", imageSize);
+      formData.append("num_inference_steps", numInferenceSteps);
+      formData.append("guidance_scale", guidanceScale);
+      formData.append("num_images", numImages);
+      formData.append("enable_safety_checker", enableSafetyChecker);
+      formData.append("strength", strength);
+      formData.append("output_format", outputFormat);
+      formData.append("sync_mode", syncMode);
+      formData.append("model", model);
+      formData.append("loras", JSON.stringify(loraUrls));
 
-      // For Kontext model, use FormData to upload image
+      // Append image if required and provided
       if (requiresInputImage() && inputImage) {
-        const formData = new FormData();
-        formData.append("prompt", prompt);
-        formData.append("image_size", imageSize);
-        formData.append("num_inference_steps", numInferenceSteps);
-        formData.append("guidance_scale", guidanceScale);
-        formData.append("num_images", numImages);
-        formData.append("enable_safety_checker", enableSafetyChecker);
-        formData.append("strength", strength);
-        formData.append("output_format", outputFormat);
-        formData.append("sync_mode", syncMode);
-        formData.append("model", model);
         formData.append("input_image", inputImage);
-        
-        // Add LoRAs if any
-        const filteredLoras = loraUrls.filter(lora => lora.url.trim() !== "");
-        formData.append("loras", JSON.stringify(filteredLoras.map(lora => ({ path: lora.url, scale: lora.scale }))));
-        
-        requestBody = formData;
-        // Don't set Content-Type header for FormData, let browser set it with boundary
-      } else {
-        // For other models, use JSON
-        headers["Content-Type"] = "application/json";
-        requestBody = JSON.stringify({
-          prompt,
-          image_size: imageSize,
-          num_inference_steps: numInferenceSteps,
-          guidance_scale: guidanceScale,
-          num_images: numImages,
-          enable_safety_checker: enableSafetyChecker,
-          strength,
-          output_format: outputFormat,
-          sync_mode: syncMode,
-          model, // Pass the selected model to the backend
-          loras: loraUrls
-            .filter(lora => lora.url.trim() !== "") // Filter out any LoRAs with empty URLs
-            .map(lora => ({ path: lora.url, scale: lora.scale })),
-        });
       }
 
       const response = await fetch("/api/generateImage", {
         method: "POST",
-        headers,
-        body: requestBody,
+        body: formData,
       });
 
       const data = await response.json();
-      console.log("API Response:", data); // Log the full response from the API
 
       if (response.ok) {
         if (data.imageUrl) {
@@ -429,6 +404,21 @@ export default function Home() {
                     </div>
                   </div>
                 )}
+              </div>
+              <div className="mt-6 animate-fade-in-up">
+                <label htmlFor="strength" className="block text-sm font-semibold text-gray-900 mb-3">
+                  Edit Strength ({strength})
+                </label>
+                <input
+                  id="strength"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={strength}
+                  onChange={(e) => setStrength(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
               </div>
               <div className="mt-2 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
                 <p className="text-sm text-yellow-800">
