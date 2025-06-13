@@ -52,7 +52,7 @@ export default function Home() {
   const [loraUrls, setLoraUrls] = useState([{ url: "", scale: 1 }]);
 
   // Model Selection
-  const [model, setModel] = useState("fal-ai/flux-lora");
+  const [model, setModel] = useState("fal-ai/flux-pro");
   // ---------------------
 
   // Fetch generated images from the outputs directory (needs hooks above)
@@ -103,13 +103,9 @@ export default function Home() {
 
   // Model pricing information (per megapixel)
   const modelPricing = {
-    "fal-ai/flux-lora": { price: 0.025, name: "Flux LoRA", description: "Best for custom styles" },
-    "fal-ai/flux/dev": { price: 0.025, name: "Flux Development", description: "High-quality generation" },
-    "fal-ai/flux-realism": { price: 0.025, name: "Flux Realism", description: "Photorealistic images" },
     "fal-ai/flux-pro": { price: 0.05, name: "FLUX.1 [pro]", description: "Premium quality" },
     "fal-ai/flux-pro/v1.1": { price: 0.04, name: "FLUX1.1 [pro]", description: "6x faster than FLUX.1" },
-    "fal-ai/flux-pro/kontext": { price: 0.04, name: "FLUX.1 Kontext [pro]", description: "Advanced image editing" },
-    "fal-ai/flux/schnell": { price: 0.003, name: "FLUX.1 [schnell]", description: "Ultra-fast generation" }
+    "fal-ai/flux-pro/kontext": { price: 0.04, name: "FLUX.1 Kontext [pro]", description: "Advanced image editing" }
   };
 
   // Calculate estimated cost based on image size and model
@@ -320,13 +316,8 @@ export default function Home() {
               onChange={(e) => setModel(e.target.value)}
               className="apple-select text-sm"
             >
-              <optgroup label="🚀 Fast & Affordable">
-                <option value="fal-ai/flux/schnell">FLUX.1 [schnell] - $0.003/MP (Ultra Fast)</option>
-                <option value="fal-ai/flux-lora">Flux LoRA - $0.025/MP (Custom Styles)</option>
-                <option value="fal-ai/flux/dev">Flux Development - $0.025/MP (High Quality)</option>
-                <option value="fal-ai/flux-realism">Flux Realism - $0.025/MP (Photorealistic)</option>
-              </optgroup>
-              <optgroup label="✨ Premium Quality">
+
+              <optgroup label="可用模型">
                 <option value="fal-ai/flux-pro/v1.1">FLUX1.1 [pro] - $0.04/MP (6x Faster)</option>
                 <option value="fal-ai/flux-pro/kontext">FLUX.1 Kontext [pro] - $0.04/MP (Image Editing)</option>
                 <option value="fal-ai/flux-pro">FLUX.1 [pro] - $0.05/MP (Premium)</option>
@@ -644,7 +635,6 @@ export default function Home() {
             </div>
           </div>
         )}
-          </div>
 
           {/* Center Panel for displaying the generated image */}
           <div className="col-span-7 apple-card-elevated flex flex-col p-8 animate-fade-in-up">
