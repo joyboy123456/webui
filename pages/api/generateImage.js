@@ -31,9 +31,16 @@ export default async function handler(req, res) {
     console.log('开始处理图片生成请求...');
 
     try {
+        // 确保临时目录存在
+        const tempDir = path.join(process.cwd(), 'temp');
+        if (!fs.existsSync(tempDir)) {
+            console.log('创建临时目录:', tempDir);
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
         // Parse form data (handles both file uploads and regular fields)
         const form = formidable({
-            uploadDir: path.join(process.cwd(), 'temp'),
+            uploadDir: tempDir,
             keepExtensions: true,
             maxFileSize: 10 * 1024 * 1024, // 10MB limit
         });
@@ -86,9 +93,18 @@ export default async function handler(req, res) {
         if (files.input_image && files.input_image[0]) {
             console.log('处理输入图片...');
             const uploadedFile = files.input_image[0];
+            
+            // 检查文件是否存在
+            if (!fs.existsSync(uploadedFile.filepath)) {
+                console.error('上传的文件不存在:', uploadedFile.filepath);
+                return res.status(400).json({ message: "上传的文件不存在或已被删除" });
+            }
+            
+            console.log('读取文件:', uploadedFile.filepath);
             const imageBuffer = fs.readFileSync(uploadedFile.filepath);
             
             // Upload image to fal storage for processing
+            console.log('上传图片到 fal 存储...');
             const imageUrl = await fal.storage.upload(imageBuffer, {
                 contentType: uploadedFile.mimetype || 'image/jpeg',
             });
@@ -97,7 +113,12 @@ export default async function handler(req, res) {
             console.log('图片已上传到 fal 存储:', imageUrl);
             
             // Clean up temporary file
-            fs.unlinkSync(uploadedFile.filepath);
+            try {
+                fs.unlinkSync(uploadedFile.filepath);
+                console.log('临时文件已删除:', uploadedFile.filepath);
+            } catch (cleanupError) {
+                console.warn('删除临时文件失败:', cleanupError.message);
+            }
         }
 
         console.log('调用 fal.ai API...');
@@ -162,6 +183,8 @@ export default async function handler(req, res) {
             errorMessage = "API 配额不足或达到限制";
         } else if (error.message.includes('network') || error.message.includes('fetch')) {
             errorMessage = "网络连接错误，请稍后重试";
+        } else if (error.message.includes('ENOENT')) {
+            errorMessage = "文件不存在错误，请重新上传图片";
         } else if (error.message) {
             errorMessage = error.message;
         }

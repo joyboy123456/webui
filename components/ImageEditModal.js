@@ -27,10 +27,22 @@ export default function ImageEditModal({ isOpen, onClose, imageUrl, onImageEdite
     setError(null);
 
     try {
+      console.log('开始编辑图片:', imageUrl);
+      
       // Fetch the image file from the server
       const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`获取图片失败: ${imageResponse.status}`);
+      }
+      
       const imageBlob = await imageResponse.blob();
       const imageFile = new File([imageBlob], imagePath.split('/').pop(), { type: imageBlob.type });
+
+      console.log('图片文件信息:', {
+        name: imageFile.name,
+        size: imageFile.size,
+        type: imageFile.type
+      });
 
       const formData = new FormData();
       formData.append("prompt", editPrompt);
@@ -47,17 +59,20 @@ export default function ImageEditModal({ isOpen, onClose, imageUrl, onImageEdite
       formData.append("output_format", "jpeg");
       formData.append("sync_mode", "true");
 
+      console.log('发送编辑请求...');
       const response = await fetch("/api/generateImage", {
         method: "POST",
         body: formData,
       });
 
       const data = await response.json();
+      console.log('编辑响应:', data);
 
       if (response.ok) {
         if (data.imageUrl) {
           // Call the callback with the generated image URL
           onImageEdited(data.imageUrl);
+          setEditPrompt(''); // Clear the prompt
           onClose(); // Close the modal after successful edit
         } else {
           throw new Error("No image URL found in the response.");

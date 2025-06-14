@@ -14,6 +14,7 @@ export default function ImageEditor({ onImageGenerated }) {
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
+      console.log('上传文件:', file.name, file.size, file.type);
       setInputImage(file);
       
       // Create preview URL
@@ -49,6 +50,13 @@ export default function ImageEditor({ onImageGenerated }) {
     setError(null);
 
     try {
+      console.log('开始编辑图片...');
+      console.log('文件信息:', {
+        name: inputImage.name,
+        size: inputImage.size,
+        type: inputImage.type
+      });
+
       const formData = new FormData();
       formData.append("prompt", editPrompt);
       formData.append("input_image", inputImage);
@@ -64,17 +72,21 @@ export default function ImageEditor({ onImageGenerated }) {
       formData.append("output_format", "jpeg");
       formData.append("sync_mode", "true");
 
+      console.log('发送编辑请求...');
       const response = await fetch("/api/generateImage", {
         method: "POST",
         body: formData,
       });
 
       const data = await response.json();
+      console.log('编辑响应:', data);
 
       if (response.ok) {
         if (data.imageUrl) {
           // Call the callback with the generated image URL
           onImageGenerated(data.imageUrl);
+          // Optionally clear the form
+          setEditPrompt('');
         } else {
           throw new Error("No image URL found in the response.");
         }
