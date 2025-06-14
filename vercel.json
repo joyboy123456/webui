@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "pages/api/generateImage.js": {
+      "maxDuration": 60
+    }
+  },
+  "env": {
+    "FAL_KEY": "@fal_key"
+  }
+}
