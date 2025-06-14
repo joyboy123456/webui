@@ -61,8 +61,8 @@ export default function Home() {
   const [syncMode, setSyncMode] = useState(false);
   const [loraUrls, setLoraUrls] = useState([{ url: "", scale: 1 }]);
 
-  // Model Selection - 更新为最热门的模型
-  const [model, setModel] = useState("fal-ai/flux/schnell");
+  // Model Selection - 默认选择最热门的 FLUX.1 Kontext
+  const [model, setModel] = useState("fal-ai/flux-pro/kontext");
   // ---------------------
 
   // Fetch generated images from the outputs directory
@@ -138,24 +138,136 @@ export default function Home() {
     );
   }
 
-  // 最新最热门的模型定价信息
+  // 🔥 顶级热门模型定价信息 (第1-10名)
   const modelPricing = {
-    // 🔥 最热门 - FLUX 系列
-    "fal-ai/flux/schnell": { 
-      price: 0.003, 
-      name: "FLUX.1 [schnell]", 
-      description: "⚡ 超快速生成，1-4步即可完成，最受欢迎",
-      category: "popular",
-      speed: "1-4 steps",
-      quality: "High"
+    // 🥇 第1名 - 当前最热门
+    "fal-ai/flux-pro/kontext": { 
+      price: 0.04, 
+      name: "FLUX.1 Kontext [pro]", 
+      description: "🔥 当前最热门！革命性指令式编辑，94.3-96.7%编辑精度",
+      category: "top",
+      speed: "Medium",
+      quality: "Ultra High",
+      rank: 1,
+      hotness: "⭐⭐⭐⭐⭐"
     },
+
+    // 🥈 第2名 - 最新旗舰
+    "fal-ai/flux-pro/v1.1-ultra": { 
+      price: 0.06, 
+      name: "FLUX.1 [pro] v1.1 Ultra", 
+      description: "🚀 最新旗舰！2K分辨率，Elo评分最高，6倍速度提升",
+      category: "top",
+      speed: "Ultra Fast",
+      quality: "Ultra High",
+      rank: 2,
+      hotness: "⭐⭐⭐⭐⭐"
+    },
+
+    // 🥉 第3名 - Google最新
+    "fal-ai/google-imagen-4": { 
+      price: 0.04, 
+      name: "Google Imagen 4", 
+      description: "🎯 Google最新力作！细节渲染突破，文字生成能力卓越",
+      category: "top",
+      speed: "Fast",
+      quality: "Ultra High",
+      rank: 3,
+      hotness: "⭐⭐⭐⭐⭐"
+    },
+
+    // 🏆 第4名 - 行业第一
+    "fal-ai/recraft-v3": { 
+      price: 0.04, 
+      name: "Recraft V3 (red_panda)", 
+      description: "👑 行业第一！Hugging Face基准测试冠军，ELO 1172分",
+      category: "top",
+      speed: "Medium",
+      quality: "Industry Leading",
+      rank: 4,
+      hotness: "⭐⭐⭐⭐⭐"
+    },
+
+    // 🌟 第5名 - 开源之王
     "fal-ai/flux/dev": { 
       price: 0.025, 
       name: "FLUX.1 [dev]", 
-      description: "🎨 开发版本，平衡质量与速度的最佳选择",
-      category: "popular", 
+      description: "🎨 开源之王！120亿参数，最符合提示要求的模型",
+      category: "popular",
       speed: "8-50 steps",
-      quality: "Very High"
+      quality: "Very High",
+      rank: 5,
+      hotness: "⭐⭐⭐⭐"
+    },
+
+    // ⚡ 第6名 - 速度之王
+    "fal-ai/flux/schnell": { 
+      price: 0.003, 
+      name: "FLUX.1 [schnell]", 
+      description: "⚡ 速度之王！0.6秒生成，10倍速度提升",
+      category: "fast",
+      speed: "1-4 steps",
+      quality: "High",
+      rank: 6,
+      hotness: "⭐⭐⭐⭐"
+    },
+
+    // 🔮 第7名 - 多模态统一
+    "fal-ai/omnigen-v1": {
+      price: 0.10,
+      name: "OmniGen v1",
+      description: "🔮 多模态统一！一个模型搞定所有生成任务",
+      category: "specialized",
+      speed: "Medium",
+      quality: "Versatile",
+      rank: 7,
+      hotness: "⭐⭐⭐⭐"
+    },
+
+    // 📝 第8名 - 文字专家
+    "fal-ai/ideogram-v3": {
+      price: 0.06, // 平均价格 (0.03-0.09)
+      name: "Ideogram v3",
+      description: "📝 文字渲染专家！复杂提示理解能力出众，月访问804万",
+      category: "specialized",
+      speed: "Variable",
+      quality: "Text Expert",
+      rank: 8,
+      hotness: "⭐⭐⭐"
+    },
+
+    // 🎯 第9名 - 专业级
+    "fal-ai/stable-diffusion-3.5-large": {
+      price: 0.035,
+      name: "Stable Diffusion 3.5 Large",
+      description: "🎯 专业级！80亿参数，排版和复杂提示理解显著改进",
+      category: "professional",
+      speed: "Medium",
+      quality: "Professional",
+      rank: 9,
+      hotness: "⭐⭐⭐"
+    },
+
+    // 💰 第10名 - 性价比王
+    "fal-ai/minimax-image-01": {
+      price: 0.01,
+      name: "MiniMax Image-01",
+      description: "💰 性价比王！固定低价，大量生成的最佳选择",
+      category: "budget",
+      speed: "Fast",
+      quality: "Good",
+      rank: 10,
+      hotness: "⭐⭐⭐"
+    },
+
+    // 经典模型保留
+    "fal-ai/flux-realism": { 
+      price: 0.025, 
+      name: "FLUX Realism", 
+      description: "📸 专业摄影级真实感，人像和风景首选",
+      category: "specialized",
+      speed: "Medium",
+      quality: "Photorealistic"
     },
     "fal-ai/flux-pro": { 
       price: 0.05, 
@@ -165,42 +277,6 @@ export default function Home() {
       speed: "Variable",
       quality: "Ultra High"
     },
-    "fal-ai/flux-pro/v1.1": { 
-      price: 0.04, 
-      name: "FLUX.1.1 [pro]", 
-      description: "🚀 最新版本，比FLUX.1快6倍，质量相同",
-      category: "premium",
-      speed: "Ultra Fast",
-      quality: "Ultra High"
-    },
-
-    // 🎭 专业特化模型
-    "fal-ai/flux-realism": { 
-      price: 0.025, 
-      name: "FLUX Realism", 
-      description: "📸 专业摄影级真实感，人像和风景首选",
-      category: "specialized",
-      speed: "Medium",
-      quality: "Photorealistic"
-    },
-    "fal-ai/flux-pro/kontext": { 
-      price: 0.04, 
-      name: "FLUX.1 Kontext [pro]", 
-      description: "✏️ 图片编辑专家，精确修改和重绘",
-      category: "specialized",
-      speed: "Medium", 
-      quality: "High"
-    },
-    "fal-ai/flux/dev/image-to-image": {
-      price: 0.025,
-      name: "FLUX Image-to-Image",
-      description: "🔄 图片转换专家，风格迁移和变换",
-      category: "specialized",
-      speed: "Medium",
-      quality: "High"
-    },
-
-    // 🎨 艺术风格模型
     "fal-ai/flux-lora": { 
       price: 0.025, 
       name: "FLUX LoRA", 
@@ -208,32 +284,6 @@ export default function Home() {
       category: "artistic",
       speed: "Medium",
       quality: "Customizable"
-    },
-    "fal-ai/aura-flow": {
-      price: 0.015,
-      name: "AuraFlow",
-      description: "🌟 开源替代方案，艺术风格出色",
-      category: "artistic", 
-      speed: "Fast",
-      quality: "Artistic"
-    },
-
-    // 🏃‍♂️ 快速模型
-    "fal-ai/lightning": {
-      price: 0.008,
-      name: "Lightning",
-      description: "⚡ 闪电般速度，2-4步生成",
-      category: "fast",
-      speed: "2-4 steps", 
-      quality: "Good"
-    },
-    "fal-ai/turbo": {
-      price: 0.012,
-      name: "Turbo",
-      description: "🏎️ 涡轮增压，快速原型设计",
-      category: "fast",
-      speed: "4-8 steps",
-      quality: "Good"
     }
   };
 
@@ -465,6 +515,12 @@ export default function Home() {
                       <span>{numImages} image{numImages > 1 ? 's' : ''} × {imageSize.replace('_', ' ')}</span>
                       <span>≈ {(modelPricing[model]?.price * (imageSize === 'square_hd' ? 1.0 : imageSize.includes('portrait') ? 0.75 : 0.5) * numImages).toFixed(4)}MP</span>
                     </div>
+                    {modelPricing[model]?.rank && (
+                      <div className="flex justify-between items-center pt-1 border-t border-purple-200">
+                        <span className="font-medium text-purple-700">🏆 Rank #{modelPricing[model].rank}</span>
+                        <span>{modelPricing[model].hotness}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -709,6 +765,9 @@ export default function Home() {
               <div className="text-right">
                 <p className="text-sm font-medium text-gray-900">${modelPricing[model]?.price}/MP</p>
                 <p className="text-xs text-gray-500">{modelPricing[model]?.speed}</p>
+                {modelPricing[model]?.rank && (
+                  <p className="text-xs text-purple-600 font-medium">🏆 #{modelPricing[model].rank}</p>
+                )}
               </div>
             </div>
 
