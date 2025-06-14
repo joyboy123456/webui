@@ -14,8 +14,15 @@ export default function handler(req, res) {
     }
 
     const APP_PASSWORD = process.env.APP_PASSWORD;
+    
+    // Debug logging (remove in production)
+    console.log('Received password:', password);
+    console.log('Expected password:', APP_PASSWORD);
+    console.log('APP_PASSWORD exists:', !!APP_PASSWORD);
+    
     if (!APP_PASSWORD) {
-      console.warn('APP_PASSWORD is not set in environment variables');
+      console.error('APP_PASSWORD is not set in environment variables');
+      return res.status(500).json({ message: 'Server configuration error' });
     }
 
     if (password === APP_PASSWORD) {
