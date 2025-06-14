@@ -14,22 +14,27 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      console.log('发送登录请求...');
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
       });
 
+      console.log('登录响应状态:', res.status);
       const data = await res.json();
+      console.log('登录响应数据:', data);
 
       if (res.ok) {
+        console.log('登录成功，跳转到首页');
         router.push("/");
       } else {
+        console.log('登录失败:', data.message);
         setError(data.message || "Login failed");
       }
     } catch (err) {
       console.error('Login request error:', err);
-      setError("Network error");
+      setError("网络错误，请检查连接");
     } finally {
       setLoading(false);
     }
@@ -95,9 +100,19 @@ export default function LoginPage() {
         </form>
         
         <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
-          <p className="text-sm text-blue-800">
-            💡 <strong>提示:</strong> 请在 <code>.env.local</code> 文件中设置 <code>APP_PASSWORD</code> 环境变量
-          </p>
+          <div className="text-sm text-blue-800 space-y-2">
+            <p>
+              💡 <strong>设置说明:</strong>
+            </p>
+            <ol className="list-decimal list-inside space-y-1 ml-4">
+              <li>在项目根目录创建 <code className="bg-blue-100 px-1 rounded">.env.local</code> 文件</li>
+              <li>添加 <code className="bg-blue-100 px-1 rounded">APP_PASSWORD=你的密码</code></li>
+              <li>重启开发服务器</li>
+            </ol>
+            <p className="text-xs text-blue-600 mt-2">
+              默认密码已设置为: <code className="bg-blue-100 px-1 rounded">123456</code>
+            </p>
+          </div>
         </div>
       </div>
     </div>
