@@ -61,8 +61,8 @@ export default function Home() {
   const [syncMode, setSyncMode] = useState(false);
   const [loraUrls, setLoraUrls] = useState([{ url: "", scale: 1 }]);
 
-  // Model Selection
-  const [model, setModel] = useState("fal-ai/flux/dev");
+  // Model Selection - 更新为最热门的模型
+  const [model, setModel] = useState("fal-ai/flux/schnell");
   // ---------------------
 
   // Fetch generated images from the outputs directory
@@ -138,13 +138,103 @@ export default function Home() {
     );
   }
 
-  // Model pricing information
+  // 最新最热门的模型定价信息
   const modelPricing = {
-    "fal-ai/flux/dev": { price: 0.025, name: "Flux Development", description: "High-quality generation with excellent detail" },
-    "fal-ai/flux-realism": { price: 0.025, name: "Flux Realism", description: "Photorealistic images with natural lighting" },
-    "fal-ai/flux-pro": { price: 0.05, name: "FLUX.1 [pro]", description: "Premium quality with advanced features" },
-    "fal-ai/flux-pro/v1.1": { price: 0.04, name: "FLUX1.1 [pro]", description: "6x faster than FLUX.1 with same quality" },
-    "fal-ai/flux-pro/kontext": { price: 0.04, name: "FLUX.1 Kontext [pro]", description: "Advanced image editing and modification" }
+    // 🔥 最热门 - FLUX 系列
+    "fal-ai/flux/schnell": { 
+      price: 0.003, 
+      name: "FLUX.1 [schnell]", 
+      description: "⚡ 超快速生成，1-4步即可完成，最受欢迎",
+      category: "popular",
+      speed: "1-4 steps",
+      quality: "High"
+    },
+    "fal-ai/flux/dev": { 
+      price: 0.025, 
+      name: "FLUX.1 [dev]", 
+      description: "🎨 开发版本，平衡质量与速度的最佳选择",
+      category: "popular", 
+      speed: "8-50 steps",
+      quality: "Very High"
+    },
+    "fal-ai/flux-pro": { 
+      price: 0.05, 
+      name: "FLUX.1 [pro]", 
+      description: "👑 专业版本，最高质量，商业级别",
+      category: "premium",
+      speed: "Variable",
+      quality: "Ultra High"
+    },
+    "fal-ai/flux-pro/v1.1": { 
+      price: 0.04, 
+      name: "FLUX.1.1 [pro]", 
+      description: "🚀 最新版本，比FLUX.1快6倍，质量相同",
+      category: "premium",
+      speed: "Ultra Fast",
+      quality: "Ultra High"
+    },
+
+    // 🎭 专业特化模型
+    "fal-ai/flux-realism": { 
+      price: 0.025, 
+      name: "FLUX Realism", 
+      description: "📸 专业摄影级真实感，人像和风景首选",
+      category: "specialized",
+      speed: "Medium",
+      quality: "Photorealistic"
+    },
+    "fal-ai/flux-pro/kontext": { 
+      price: 0.04, 
+      name: "FLUX.1 Kontext [pro]", 
+      description: "✏️ 图片编辑专家，精确修改和重绘",
+      category: "specialized",
+      speed: "Medium", 
+      quality: "High"
+    },
+    "fal-ai/flux/dev/image-to-image": {
+      price: 0.025,
+      name: "FLUX Image-to-Image",
+      description: "🔄 图片转换专家，风格迁移和变换",
+      category: "specialized",
+      speed: "Medium",
+      quality: "High"
+    },
+
+    // 🎨 艺术风格模型
+    "fal-ai/flux-lora": { 
+      price: 0.025, 
+      name: "FLUX LoRA", 
+      description: "🎭 支持自定义LoRA，无限风格可能",
+      category: "artistic",
+      speed: "Medium",
+      quality: "Customizable"
+    },
+    "fal-ai/aura-flow": {
+      price: 0.015,
+      name: "AuraFlow",
+      description: "🌟 开源替代方案，艺术风格出色",
+      category: "artistic", 
+      speed: "Fast",
+      quality: "Artistic"
+    },
+
+    // 🏃‍♂️ 快速模型
+    "fal-ai/lightning": {
+      price: 0.008,
+      name: "Lightning",
+      description: "⚡ 闪电般速度，2-4步生成",
+      category: "fast",
+      speed: "2-4 steps", 
+      quality: "Good"
+    },
+    "fal-ai/turbo": {
+      price: 0.012,
+      name: "Turbo",
+      description: "🏎️ 涡轮增压，快速原型设计",
+      category: "fast",
+      speed: "4-8 steps",
+      quality: "Good"
+    }
   };
 
   // Calculate estimated cost
@@ -162,7 +252,7 @@ export default function Home() {
 
     const megapixels = sizeMegapixels[imageSize] || 1.0;
     const totalCost = modelInfo.price * megapixels * numImages;
-    return totalCost.toFixed(3);
+    return totalCost.toFixed(4);
   };
 
   const generateImage = async (e) => {
@@ -178,7 +268,7 @@ export default function Home() {
 
     try {
       if (requiresInputImage() && !inputImage) {
-        setError("请为Kontext模型上传一张输入图片");
+        setError("请为此模型上传一张输入图片");
         setLoading(false);
         return;
       }
@@ -275,7 +365,7 @@ export default function Home() {
   };
 
   const requiresInputImage = () => {
-    return model === "fal-ai/flux-pro/kontext";
+    return model === "fal-ai/flux-pro/kontext" || model === "fal-ai/flux/dev/image-to-image";
   };
 
   const downloadImage = async (imageUrl) => {
@@ -336,6 +426,15 @@ export default function Home() {
 
             {activeTab === "generate" ? (
               <form onSubmit={generateImage} className="space-y-6">
+                {/* Model Selection - 放在最前面 */}
+                <div className="animate-fade-in-up">
+                  <ModelSelector 
+                    value={model}
+                    onChange={setModel}
+                    modelPricing={modelPricing}
+                  />
+                </div>
+
                 {/* Prompt */}
                 <div className="animate-fade-in-up">
                   <label htmlFor="prompt" className="block text-sm font-semibold text-gray-900 mb-3">
@@ -364,7 +463,7 @@ export default function Home() {
                     </div>
                     <div className="flex justify-between">
                       <span>{numImages} image{numImages > 1 ? 's' : ''} × {imageSize.replace('_', ' ')}</span>
-                      <span>≈ {(modelPricing[model]?.price * (imageSize === 'square_hd' ? 1.0 : imageSize.includes('portrait') ? 0.75 : 0.5) * numImages).toFixed(3)}MP</span>
+                      <span>≈ {(modelPricing[model]?.price * (imageSize === 'square_hd' ? 1.0 : imageSize.includes('portrait') ? 0.75 : 0.5) * numImages).toFixed(4)}MP</span>
                     </div>
                   </div>
                 </div>
@@ -392,16 +491,7 @@ export default function Home() {
                   )}
                 </button>
 
-                {/* Model Selection */}
-                <div className="animate-fade-in-up">
-                  <ModelSelector 
-                    value={model}
-                    onChange={setModel}
-                    modelPricing={modelPricing}
-                  />
-                </div>
-
-                {/* Image Upload for Kontext */}
+                {/* Image Upload for models that require it */}
                 {requiresInputImage() && (
                   <div className="animate-fade-in-up">
                     <label className="block text-sm font-semibold text-gray-900 mb-3">
@@ -470,6 +560,59 @@ export default function Home() {
                   </select>
                 </div>
 
+                {/* LoRA Settings - 只在支持的模型下显示 */}
+                {model === "fal-ai/flux-lora" && (
+                  <div className="animate-fade-in-up">
+                    <label className="block text-sm font-semibold text-gray-900 mb-3">
+                      Custom LoRA Models
+                    </label>
+                    <div className="space-y-3">
+                      {loraUrls.map((lora, index) => (
+                        <div key={index} className="space-y-2">
+                          <input
+                            type="text"
+                            value={lora.url}
+                            onChange={(e) => handleLoraChange(index, e.target.value)}
+                            className="apple-input text-sm"
+                            placeholder="Enter LoRA URL"
+                          />
+                          <input
+                            type="number"
+                            value={lora.scale}
+                            onChange={(e) => handleLoraScaleChange(index, e.target.value)}
+                            className="apple-input text-sm"
+                            placeholder="Scale (0.0 - 1.0)"
+                            step="0.1"
+                            min="0"
+                            max="1"
+                          />
+                        </div>
+                      ))}
+
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={addLoraField}
+                          className="apple-button-secondary flex-1 py-2 text-sm"
+                        >
+                          <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                          Add LoRA
+                        </button>
+
+                        {loraUrls.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={removeLoraField}
+                            className="apple-button-secondary px-4 py-2 text-sm"
+                          >
+                            <FontAwesomeIcon icon={faMinus} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Advanced Settings */}
                 <details className="animate-fade-in-up">
                   <summary className="cursor-pointer text-sm font-semibold text-gray-900 mb-3">
@@ -485,6 +628,7 @@ export default function Home() {
                           onChange={(e) => setNumInferenceSteps(e.target.value)}
                           className="apple-input text-sm"
                           min="1"
+                          max="50"
                         />
                       </div>
                       <div>
@@ -495,6 +639,31 @@ export default function Home() {
                           value={guidanceScale}
                           onChange={(e) => setGuidanceScale(e.target.value)}
                           className="apple-input text-sm"
+                          min="1"
+                          max="20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Images</label>
+                        <input
+                          type="number"
+                          value={numImages}
+                          onChange={(e) => setNumImages(e.target.value)}
+                          className="apple-input text-sm"
+                          min="1"
+                          max="4"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Strength</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={strength}
+                          onChange={(e) => setStrength(e.target.value)}
+                          className="apple-input text-sm"
+                          min="0"
+                          max="1"
                         />
                       </div>
                     </div>
@@ -539,7 +708,7 @@ export default function Home() {
               </div>
               <div className="text-right">
                 <p className="text-sm font-medium text-gray-900">${modelPricing[model]?.price}/MP</p>
-                <p className="text-xs text-gray-500">Cost per megapixel</p>
+                <p className="text-xs text-gray-500">{modelPricing[model]?.speed}</p>
               </div>
             </div>
 
@@ -551,7 +720,7 @@ export default function Home() {
                     <LoadingSpinner size="xl" color="purple" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">Creating your masterpiece</h3>
-                  <p className="text-gray-500">This may take a few moments...</p>
+                  <p className="text-gray-500">Using {modelPricing[model]?.name}...</p>
                   <div className="mt-4 w-64 mx-auto">
                     <ProgressBar progress={generationProgress} />
                   </div>
@@ -602,7 +771,7 @@ export default function Home() {
                     </svg>
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">Ready to create</h3>
-                  <p className="text-gray-500">Enter a prompt and click generate to start</p>
+                  <p className="text-gray-500">Select a model and enter a prompt to start</p>
                 </div>
               )}
             </div>
