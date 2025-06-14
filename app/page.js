@@ -39,9 +39,6 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false); // For image preview modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false); // For image editing modal
   const [activeTab, setActiveTab] = useState("generate"); // For tab switching: "generate" or "edit"
-  const [isPromptConverterOpen, setIsPromptConverterOpen] = useState(false); // For prompt converter modal
-  const [chinesePrompt, setChinesePrompt] = useState(""); // For Chinese prompt input
-  const [loadingConversion, setLoadingConversion] = useState(false); // For conversion loading state
 
   // Image upload states for image-to-image models
   const [inputImage, setInputImage] = useState(null);
@@ -211,32 +208,6 @@ export default function Home() {
     setIsModalOpen(false); // Close the modal
   };
 
-  const handleConvertPrompt = async () => {
-    if (!chinesePrompt.trim()) return;
-    
-    setLoadingConversion(true);
-    try {
-      const response = await fetch('/api/convertPrompt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chineseText: chinesePrompt })
-      });
-      
-      const data = await response.json();
-      if (response.ok) {
-        setPrompt(data.englishText);
-        setIsPromptConverterOpen(false);
-        setChinesePrompt("");
-      } else {
-        setError(data.message || "翻译失败");
-      }
-    } catch (err) {
-      setError("翻译服务连接失败");
-    } finally {
-      setLoadingConversion(false);
-    }
-  };
-
   const addLoraField = () => {
     setLoraUrls([...loraUrls, { url: "", scale: 1 }]);
   };
@@ -285,8 +256,6 @@ export default function Home() {
     return model === "fal-ai/flux-pro/kontext";
   };
 
-  // 移除中文翻译功能
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100">
       <div className="container mx-auto px-6 py-8">
@@ -321,23 +290,14 @@ export default function Home() {
             <label htmlFor="prompt" className="block text-sm font-semibold text-gray-900 mb-3">
               Describe your vision
             </label>
-            <div className="relative">
-              <textarea
-                id="prompt"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-28 resize-none text-sm leading-relaxed"
-                placeholder="描述你想要生成的图像..."
-              />
-              <button
-                type="button"
-                onClick={() => setIsPromptConverterOpen(true)}
-                className="absolute right-2 bottom-2 bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-medium py-1 px-2 rounded transition-colors"
-              >
-                中文翻译成英文
-              </button>
-            </div>
+            <textarea
+              id="prompt"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-28 resize-none text-sm leading-relaxed"
+              placeholder="描述你想要生成的图像..."
+            />
           </div>
 
           {/* Cost Summary */}
@@ -796,52 +756,6 @@ export default function Home() {
                 setGeneratedImages([imageName, ...generatedImages]);
               }} 
             />
-            
-            {/* Chinese Prompt Converter Modal */}
-            {isPromptConverterOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 animate-fade-in">
-                <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 animate-scale-in">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-bold text-gray-900">中文翻译成英文</h3>
-                    <button 
-                      onClick={() => setIsPromptConverterOpen(false)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      <FontAwesomeIcon icon={faTimes} className="w-5 h-5" />
-                    </button>
-                  </div>
-                  
-                  <div className="mb-4">
-                    <label htmlFor="chinesePrompt" className="block text-sm font-semibold text-gray-900 mb-2">
-                      输入中文描述 <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      id="chinesePrompt"
-                      value={chinesePrompt}
-                      onChange={(e) => setChinesePrompt(e.target.value)}
-                      className="w-full h-24 p-3 border border-gray-300 rounded-lg resize-none"
-                      placeholder="例如：一只可爱的小猫在花园里玩耍"
-                    />
-                  </div>
-                  
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleConvertPrompt}
-                      disabled={loadingConversion}
-                      className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 disabled:opacity-50"
-                    >
-                      {loadingConversion ? "翻译中..." : "翻译"}
-                    </button>
-                    <button
-                      onClick={() => setIsPromptConverterOpen(false)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                    >
-                      取消
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
             
             {/* Enhanced Modal for full-size image */}
             {isModalOpen && (
