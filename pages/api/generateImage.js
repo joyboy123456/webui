@@ -152,6 +152,30 @@ const convertImageSize = (imageSize, model) => {
     return imageSize;
 };
 
+// 提示词质量检查和增强
+const enhancePrompt = (prompt, model) => {
+    // 如果提示词太短或太简单，进行增强
+    if (prompt.length < 10 || /^(1girl|1boy|cat|dog|car)$/i.test(prompt.trim())) {
+        console.log('🔧 检测到简单提示词，进行增强...');
+        
+        const enhancedPrompts = {
+            '1girl': 'a beautiful young woman with long flowing hair, wearing elegant clothing, standing in a scenic outdoor setting, soft natural lighting, high quality, detailed',
+            '1boy': 'a handsome young man with confident expression, wearing casual modern clothing, urban background, natural lighting, high quality, detailed',
+            'cat': 'a cute fluffy cat with bright eyes, sitting gracefully, soft fur texture, warm lighting, high quality, detailed',
+            'dog': 'a friendly golden retriever dog with happy expression, sitting in a park, natural lighting, high quality, detailed',
+            'car': 'a sleek modern sports car with metallic paint, parked on a scenic road, dramatic lighting, high quality, detailed'
+        };
+        
+        const enhanced = enhancedPrompts[prompt.toLowerCase().trim()];
+        if (enhanced) {
+            console.log(`✨ 提示词增强: "${prompt}" -> "${enhanced}"`);
+            return enhanced;
+        }
+    }
+    
+    return prompt;
+};
+
 export default async function handler(req, res) {
     const startTime = Date.now();
     console.log('🚀 开始处理图片生成请求...');
@@ -193,7 +217,7 @@ export default async function handler(req, res) {
         console.log('✅ 表单解析完成');
 
         // Extract fields
-        const prompt = fields.prompt?.[0] || '';
+        let prompt = fields.prompt?.[0] || '';
         const image_size = fields.image_size?.[0] || 'landscape_4_3';
         const num_inference_steps = parseInt(fields.num_inference_steps?.[0]) || 28;
         const guidance_scale = parseFloat(fields.guidance_scale?.[0]) || 3.5;
@@ -255,6 +279,13 @@ export default async function handler(req, res) {
                     debugUrl: "/debug-vercel"
                 }
             });
+        }
+
+        // 增强提示词
+        const originalPrompt = prompt;
+        prompt = enhancePrompt(prompt, model);
+        if (prompt !== originalPrompt) {
+            console.log(`✨ 提示词已增强: "${originalPrompt}" -> "${prompt}"`);
         }
 
         // 基础输入参数
@@ -387,7 +418,8 @@ export default async function handler(req, res) {
                 originalUrl: imageUrl,
                 model: model,
                 generationTime: totalTime,
-                environment: 'vercel'
+                environment: 'vercel',
+                enhancedPrompt: prompt !== originalPrompt ? prompt : null
             });
         } else {
             // 本地环境
@@ -397,7 +429,8 @@ export default async function handler(req, res) {
                 originalUrl: imageUrl,
                 model: model,
                 generationTime: totalTime,
-                environment: 'local'
+                environment: 'local',
+                enhancedPrompt: prompt !== originalPrompt ? prompt : null
             });
         }
 
