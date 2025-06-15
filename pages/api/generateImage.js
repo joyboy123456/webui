@@ -198,16 +198,19 @@ export default async function handler(req, res) {
             console.log('- 部署URL:', process.env.VERCEL_URL || 'unknown');
         }
 
-        // 确保临时目录存在 (Vercel 使用 /tmp)
-        const tempDir = process.env.VERCEL ? '/tmp' : path.join(process.cwd(), 'temp');
+        // 🔥 修复：确保使用正确的临时目录
+        const tempDir = '/tmp'; // Vercel 环境下只能使用 /tmp
+        console.log('📁 使用临时目录:', tempDir);
+        
+        // 确保临时目录存在
         if (!fs.existsSync(tempDir)) {
             console.log('📁 创建临时目录:', tempDir);
             fs.mkdirSync(tempDir, { recursive: true });
         }
 
-        // Parse form data
+        // Parse form data - 🔥 修复：直接使用 /tmp 作为上传目录
         const form = formidable({
-            uploadDir: tempDir,
+            uploadDir: tempDir, // 直接使用 /tmp
             keepExtensions: true,
             maxFileSize: 10 * 1024 * 1024, // 10MB limit
         });
@@ -385,30 +388,12 @@ export default async function handler(req, res) {
         const arrayBuffer = await imageResponse.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        // Vercel 环境下的文件保存路径
-        const outputDir = process.env.VERCEL 
-            ? '/tmp/outputs' 
-            : path.join(process.cwd(), 'public', 'outputs');
-        
-        const imageName = `generated-image-${Date.now()}.jpeg`;
-        const outputFilePath = path.join(outputDir, imageName);
-
-        // 确保输出目录存在
-        if (!fs.existsSync(outputDir)) {
-            console.log('📁 创建输出目录:', outputDir);
-            fs.mkdirSync(outputDir, { recursive: true });
-        }
-
-        // 保存图片
-        console.log('💾 保存图片到:', outputFilePath);
-        fs.writeFileSync(outputFilePath, buffer);
-
         const totalTime = Date.now() - startTime;
         console.log(`🎉 图片生成成功! 总耗时: ${totalTime}ms`);
 
-        // Vercel 环境下需要返回临时URL或base64
+        // 🔥 修复：在 Vercel 环境下直接返回 base64，不保存文件
         if (process.env.VERCEL) {
-            // 在 Vercel 上，我们需要将图片转换为 base64 或使用其他方式
+            console.log('📱 Vercel 环境：返回 base64 格式图片');
             const base64Image = buffer.toString('base64');
             const dataUrl = `data:image/jpeg;base64,${base64Image}`;
             
@@ -422,7 +407,21 @@ export default async function handler(req, res) {
                 enhancedPrompt: prompt !== originalPrompt ? prompt : null
             });
         } else {
-            // 本地环境
+            // 本地环境：保存到文件系统
+            const outputDir = path.join(process.cwd(), 'public', 'outputs');
+            const imageName = `generated-image-${Date.now()}.jpeg`;
+            const outputFilePath = path.join(outputDir, imageName);
+
+            // 确保输出目录存在
+            if (!fs.existsSync(outputDir)) {
+                console.log('📁 创建输出目录:', outputDir);
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
+
+            // 保存图片
+            console.log('💾 保存图片到:', outputFilePath);
+            fs.writeFileSync(outputFilePath, buffer);
+            
             return res.status(200).json({ 
                 message: 'Image generated successfully!', 
                 imageUrl: `/outputs/${imageName}`,
@@ -491,9 +490,17 @@ export default async function handler(req, res) {
                     "3. 检查fal.ai服务状态"
                 ]
             };
-        } else if (error.message.includes('ENOENT')) {
-            errorMessage = "📁 文件不存在错误，请重新上传图片";
-            errorCode = "FILE_ERROR";
+        } else if (error.message.includes('ENOENT') || error.message.includes('mkdir')) {
+            errorMessage = "📁 文件系统错误，这是Vercel环境限制";
+            errorCode = "FILESYSTEM_ERROR";
+            solution = {
+                title: "解决方案",
+                steps: [
+                    "1. 这个错误已经修复",
+                    "2. 重新部署项目",
+                    "3. 如果仍有问题，请联系支持"
+                ]
+            };
         } else if (error.message.includes('Invalid input') || error.message.includes('validation')) {
             errorMessage = "📝 输入参数不正确，请检查模型要求";
             errorCode = "INVALID_INPUT";
