@@ -9,7 +9,7 @@ import ProgressBar from "../components/ProgressBar";
 import StatusBadge from "../components/StatusBadge";
 import ImageGallery from "../components/ImageGallery";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faMinus, faUpload, faImage, faEdit, faTimes, faDownload, faMagic, faRocket, faSparkles, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faMinus, faUpload, faImage, faEdit, faTimes, faDownload, faMagic, faRocket, faStar, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -496,7 +496,7 @@ export default function Home() {
               {/* Prompt */}
               <div>
                 <label htmlFor="prompt" className="block text-sm font-semibold text-gray-900 mb-3">
-                  <FontAwesomeIcon icon={faSparkles} className="mr-2 text-blue-500" />
+                  <FontAwesomeIcon icon={faStar} className="mr-2 text-blue-500" />
                   Describe your vision
                 </label>
                 <textarea
@@ -767,7 +767,7 @@ export default function Home() {
                   {/* Prompt */}
                   <div className="animate-fade-in-up">
                     <label htmlFor="prompt" className="block text-sm font-semibold text-gray-900 mb-3">
-                      <FontAwesomeIcon icon={faSparkles} className="mr-2 text-blue-500" />
+                      <FontAwesomeIcon icon={faStar} className="mr-2 text-blue-500" />
                       Describe your vision
                     </label>
                     <textarea
