@@ -7,6 +7,11 @@ export default function handler(req, res) {
   const outputDir = path.join(process.cwd(), 'public', 'outputs');
   
   try {
+    // Ensure the outputs directory exists
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+    
     const files = fs.readdirSync(outputDir);
     const images = files.filter(file => /\.(jpg|jpeg|png)$/i.test(file)); // Only images
     res.status(200).json({ images });
