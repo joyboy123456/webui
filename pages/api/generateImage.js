@@ -169,7 +169,9 @@ export default async function handler(req, res) {
             console.log('🔧 Vercel 环境配置检查:');
             console.log('- FAL_KEY 存在:', !!FAL_KEY);
             console.log('- FAL_KEY 长度:', FAL_KEY ? FAL_KEY.length : 0);
+            console.log('- FAL_KEY 前缀:', FAL_KEY ? FAL_KEY.substring(0, 8) + '...' : 'N/A');
             console.log('- 函数区域:', process.env.VERCEL_REGION || 'unknown');
+            console.log('- 部署URL:', process.env.VERCEL_URL || 'unknown');
         }
 
         // 确保临时目录存在 (Vercel 使用 /tmp)
@@ -221,8 +223,37 @@ export default async function handler(req, res) {
         if (!FAL_KEY) {
             console.log('❌ FAL_KEY 未配置');
             return res.status(500).json({ 
-                message: "API密钥未配置，请在Vercel环境变量中设置FAL_KEY",
-                code: "MISSING_API_KEY"
+                message: "❌ API密钥未配置！请在Vercel项目设置中添加FAL_KEY环境变量",
+                code: "MISSING_API_KEY",
+                solution: {
+                    title: "解决方案",
+                    steps: [
+                        "1. 登录 Vercel Dashboard",
+                        "2. 进入项目设置 → Environment Variables", 
+                        "3. 添加 FAL_KEY 变量",
+                        "4. 重新部署项目"
+                    ],
+                    debugUrl: "/debug-vercel"
+                }
+            });
+        }
+
+        // 验证FAL_KEY格式
+        if (!FAL_KEY.startsWith('fal-')) {
+            console.log('⚠️ FAL_KEY 格式可能不正确');
+            return res.status(500).json({
+                message: "❌ API密钥格式不正确！FAL API密钥应该以'fal-'开头",
+                code: "INVALID_API_KEY_FORMAT",
+                solution: {
+                    title: "解决方案",
+                    steps: [
+                        "1. 访问 https://fal.ai/dashboard/keys",
+                        "2. 重新生成API密钥",
+                        "3. 确保密钥以'fal-'开头",
+                        "4. 更新Vercel环境变量"
+                    ],
+                    debugUrl: "/debug-vercel"
+                }
             });
         }
 
@@ -296,7 +327,17 @@ export default async function handler(req, res) {
             return res.status(500).json({ 
                 message: "API返回的结果中没有图片",
                 code: "NO_IMAGES_RETURNED",
-                result: result
+                result: result,
+                solution: {
+                    title: "可能的原因",
+                    steps: [
+                        "1. 提示词被安全检查器拦截",
+                        "2. 模型暂时不可用",
+                        "3. API配额不足",
+                        "4. 网络连接问题"
+                    ],
+                    debugUrl: "/debug-vercel"
+                }
             });
         }
 
@@ -369,30 +410,65 @@ export default async function handler(req, res) {
         // 提供更详细的错误信息
         let errorMessage = "生成图片失败";
         let errorCode = "UNKNOWN_ERROR";
+        let solution = null;
         
-        if (error.message.includes('credentials') || error.message.includes('unauthorized')) {
-            errorMessage = "API 密钥无效或已过期，请检查 FAL_KEY 环境变量";
+        if (error.message.includes('credentials') || error.message.includes('unauthorized') || error.message.includes('401')) {
+            errorMessage = "❌ API密钥无效！请检查FAL_KEY是否正确";
             errorCode = "INVALID_CREDENTIALS";
-        } else if (error.message.includes('quota') || error.message.includes('limit')) {
-            errorMessage = "API 配额不足或达到限制";
+            solution = {
+                title: "解决方案",
+                steps: [
+                    "1. 检查FAL_KEY是否正确设置",
+                    "2. 访问 https://fal.ai/dashboard/keys 重新生成密钥",
+                    "3. 更新Vercel环境变量",
+                    "4. 重新部署项目"
+                ],
+                debugUrl: "/debug-vercel"
+            };
+        } else if (error.message.includes('quota') || error.message.includes('limit') || error.message.includes('insufficient')) {
+            errorMessage = "❌ API配额不足！请检查您的fal.ai账户余额";
             errorCode = "QUOTA_EXCEEDED";
+            solution = {
+                title: "解决方案",
+                steps: [
+                    "1. 访问 https://fal.ai/dashboard 查看账户余额",
+                    "2. 充值账户或等待配额重置",
+                    "3. 检查使用限制设置"
+                ]
+            };
         } else if (error.message.includes('timeout') || error.message.includes('超时')) {
-            errorMessage = "请求超时，请稍后重试";
+            errorMessage = "⏱️ 请求超时，请稍后重试";
             errorCode = "TIMEOUT";
-        } else if (error.message.includes('network') || error.message.includes('fetch')) {
-            errorMessage = "网络连接错误，请稍后重试";
+            solution = {
+                title: "解决方案",
+                steps: [
+                    "1. 稍等片刻后重试",
+                    "2. 尝试使用更快的模型（如FLUX schnell）",
+                    "3. 减少生成图片数量"
+                ]
+            };
+        } else if (error.message.includes('network') || error.message.includes('fetch') || error.message.includes('ENOTFOUND')) {
+            errorMessage = "🌐 网络连接错误，请稍后重试";
             errorCode = "NETWORK_ERROR";
+            solution = {
+                title: "解决方案",
+                steps: [
+                    "1. 检查网络连接",
+                    "2. 稍后重试",
+                    "3. 检查fal.ai服务状态"
+                ]
+            };
         } else if (error.message.includes('ENOENT')) {
-            errorMessage = "文件不存在错误，请重新上传图片";
+            errorMessage = "📁 文件不存在错误，请重新上传图片";
             errorCode = "FILE_ERROR";
-        } else if (error.message.includes('Invalid input')) {
-            errorMessage = "输入参数不正确，请检查模型要求";
+        } else if (error.message.includes('Invalid input') || error.message.includes('validation')) {
+            errorMessage = "📝 输入参数不正确，请检查模型要求";
             errorCode = "INVALID_INPUT";
-        } else if (error.message.includes('Model not found')) {
-            errorMessage = "模型不存在或暂时不可用";
+        } else if (error.message.includes('Model not found') || error.message.includes('404')) {
+            errorMessage = "🤖 模型不存在或暂时不可用";
             errorCode = "MODEL_NOT_FOUND";
         } else if (error.message) {
-            errorMessage = error.message;
+            errorMessage = `❌ ${error.message}`;
         }
         
         res.status(500).json({ 
@@ -402,6 +478,7 @@ export default async function handler(req, res) {
             model: fields?.model?.[0] || 'unknown',
             environment: process.env.VERCEL ? 'vercel' : 'local',
             errorTime: errorTime,
+            solution: solution,
             details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
