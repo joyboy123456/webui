@@ -38,3 +38,4 @@ next-env.d.ts
 # Fal.ai Web UI specific
 public/outputs/
 .env.local
+.env
